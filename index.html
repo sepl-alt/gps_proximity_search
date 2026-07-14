@@ -1,0 +1,1302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GPS Proximity Vehicle Search</title>
+<!-- Primary XLSX Library -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.min.js"></script>
+<!-- Backup XLSX Library (in case primary fails) -->
+<script>
+    if (typeof XLSX === 'undefined') {
+        document.write('<script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"><\/script>');
+    }
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+    :root{
+        --bg:#EEF2EF;
+        --paper:#FFFFFF;
+        --line:#D9E1DC;
+        --line-soft:#E7ECE8;
+        --ink:#16241F;
+        --muted:#5C6B62;
+        --muted-2:#93A29A;
+        --teal:#0F6B5C;
+        --teal-soft:#E4F1EE;
+        --teal-line:#BFDAD3;
+        --amber:#E8871E;
+        --amber-soft:#FCEEDC;
+        --red:#C0392B;
+        --red-soft:#FBEAE7;
+        --green:#2F8F4E;
+        --green-soft:#E9F6ED;
+        --display:'Fraunces', serif;
+        --body:'Inter', -apple-system, sans-serif;
+        --mono:'IBM Plex Mono', monospace;
+    }
+
+    *{margin:0;padding:0;box-sizing:border-box;}
+
+    body{
+        font-family:var(--body);
+        color:var(--ink);
+        background:
+            repeating-linear-gradient(0deg, rgba(15,107,92,0.045) 0px, rgba(15,107,92,0.045) 1px, transparent 1px, transparent 34px),
+            repeating-linear-gradient(90deg, rgba(15,107,92,0.045) 0px, rgba(15,107,92,0.045) 1px, transparent 1px, transparent 34px),
+            var(--bg);
+        min-height:100vh;
+        padding:32px 16px 64px;
+    }
+
+    .container{max-width:1040px;margin:0 auto;}
+
+    /* ---------- Header ---------- */
+    .header{
+        position:relative;
+        border:1px solid var(--line);
+        background:var(--paper);
+        border-radius:4px;
+        padding:30px 32px;
+        margin-bottom:22px;
+        display:flex;
+        align-items:center;
+        gap:24px;
+        box-shadow:0 1px 0 var(--line);
+    }
+
+    .compass{
+        width:58px;height:58px;flex:0 0 auto;border-radius:50%;
+        border:1.5px solid var(--ink);position:relative;background:var(--paper);
+    }
+    .compass::before,.compass::after{
+        content:'';position:absolute;background:var(--line);
+    }
+    .compass::before{top:4px;bottom:4px;left:50%;width:1px;transform:translateX(-50%);}
+    .compass::after{left:4px;right:4px;top:50%;height:1px;transform:translateY(-50%);}
+    .compass-needle{
+        position:absolute;top:50%;left:50%;width:2px;height:20px;
+        background:linear-gradient(to bottom, var(--red) 0%, var(--red) 50%, var(--ink) 50%, var(--ink) 100%);
+        transform-origin:50% 50%;
+        transform:translate(-50%,-100%) rotate(24deg);
+        animation:needle-settle 5s ease-in-out infinite;
+        border-radius:2px;
+    }
+    @keyframes needle-settle{
+        0%,100%{transform:translate(-50%,-100%) rotate(22deg);}
+        50%{transform:translate(-50%,-100%) rotate(-16deg);}
+    }
+    .compass-dot{position:absolute;top:50%;left:50%;width:5px;height:5px;background:var(--ink);border-radius:50%;transform:translate(-50%,-50%);}
+    .compass-n{position:absolute;top:-2px;left:50%;transform:translateX(-50%);font-family:var(--mono);font-size:8px;font-weight:700;color:var(--muted-2);}
+
+    .header-text .eyebrow{
+        font-family:var(--mono);font-size:11px;letter-spacing:.12em;color:var(--teal);
+        text-transform:uppercase;margin-bottom:6px;font-weight:600;
+    }
+    .header-text h1{font-family:var(--display);font-size:26px;font-weight:600;letter-spacing:-0.01em;color:var(--ink);}
+    .header-text p{font-size:13.5px;color:var(--muted);margin-top:6px;}
+
+    /* ---------- Panels ---------- */
+    .panel{
+        border:1px solid var(--line);
+        background:var(--paper);
+        border-radius:4px;
+        padding:26px;
+        margin-bottom:20px;
+    }
+
+    .panel-title{
+        display:flex;align-items:baseline;gap:12px;
+        margin-bottom:18px;
+    }
+    .panel-title .idx{
+        font-family:var(--display);font-size:22px;font-weight:600;color:var(--teal);
+        line-height:1;
+    }
+    .panel-title .label{
+        font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;
+        color:var(--muted);font-weight:600;
+    }
+    .panel-title::after{content:'';flex:1;height:1px;background:var(--line);align-self:center;}
+
+    .info-box{
+        background:var(--teal-soft);
+        border:1px solid var(--teal-line);
+        border-left:3px solid var(--teal);
+        padding:12px 14px;
+        border-radius:3px;
+        margin-bottom:18px;
+        font-size:12.5px;
+        color:var(--ink);
+        line-height:1.6;
+    }
+    .info-box strong{color:var(--teal);}
+    .info-box code{font-family:var(--mono);font-size:11.5px;color:#0a4a3f;background:rgba(15,107,92,0.08);padding:1px 5px;border-radius:3px;}
+
+    /* ---------- Upload ---------- */
+    .upload-area{
+        border:1.5px dashed var(--line);
+        border-radius:4px;
+        padding:28px;
+        text-align:center;
+        background:#FAFBFA;
+        cursor:pointer;
+        transition:all .2s;
+    }
+    .upload-area:hover{border-color:var(--teal);background:var(--teal-soft);}
+    .upload-area input{display:none;}
+    .upload-icon{font-size:24px;margin-bottom:10px;opacity:.8;}
+    .upload-area p{font-size:13.5px;color:var(--ink);}
+    .upload-area .sub{font-size:11.5px;color:var(--muted-2);margin-top:5px;font-family:var(--mono);}
+
+    .file-list{margin-top:14px;display:flex;flex-direction:column;gap:7px;}
+    .file-item{
+        background:#FAFBFA;border:1px solid var(--line-soft);
+        padding:10px 14px;border-radius:3px;
+        display:flex;justify-content:space-between;align-items:center;
+        font-size:12.5px;font-family:var(--mono);color:var(--ink);
+    }
+    .file-item .remove-btn{
+        background:transparent;color:var(--red);border:1px solid #EBC3BC;
+        padding:4px 10px;border-radius:3px;cursor:pointer;font-size:11px;font-family:var(--body);font-weight:600;
+    }
+    .file-item .remove-btn:hover{background:var(--red-soft);}
+
+    /* ---------- Search form ---------- */
+    .search-form{display:grid;grid-template-columns:1.2fr 0.8fr 0.8fr;gap:18px;}
+    .form-group{display:flex;flex-direction:column;}
+    .form-group label{
+        font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);
+        margin-bottom:8px;font-weight:600;font-family:var(--mono);
+    }
+    .form-group input{
+        padding:12px 13px;border:1px solid var(--line);border-radius:3px;
+        background:#FAFBFA;color:var(--ink);font-size:14px;font-family:var(--mono);
+        transition:border-color .2s, box-shadow .2s;
+    }
+    .form-group input::placeholder{color:var(--muted-2);}
+    .form-group input:focus{
+        outline:none;border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-soft);background:var(--paper);
+    }
+
+    .search-button{
+        grid-column:1/-1;
+        padding:13px 30px;
+        background:var(--teal);
+        color:#fff;
+        border:none;border-radius:3px;
+        font-size:14px;font-weight:700;letter-spacing:.01em;
+        cursor:pointer;transition:background .15s, transform .1s;
+        font-family:var(--body);
+    }
+    .search-button:hover{background:#0C5347;}
+    .search-button:active{transform:translateY(1px);}
+    .search-button:disabled{opacity:.4;cursor:not-allowed;}
+
+    .error{
+        background:var(--red-soft);color:var(--red);
+        border:1px solid #EBC3BC;
+        padding:12px 14px;border-radius:3px;margin-top:14px;
+        font-size:13px;display:none;
+    }
+    .error.show{display:block;}
+
+    /* ---------- Results ---------- */
+    .results-section{display:none;}
+    .results-section.show{display:block;}
+
+    .result-count{
+        background:var(--green-soft);border:1px solid #BFE0C9;
+        color:var(--green);padding:13px 16px;border-radius:3px;margin-bottom:18px;
+        font-weight:600;font-size:13.5px;font-family:var(--mono);
+    }
+    .result-count.no-results{
+        background:var(--red-soft);border-color:#EBC3BC;color:var(--red);
+    }
+
+    .loading{text-align:center;padding:26px;color:var(--teal);}
+    .spinner{
+        border:3px solid var(--line);border-top:3px solid var(--teal);
+        border-radius:50%;width:32px;height:32px;
+        animation:spin 1s linear infinite;margin:0 auto 10px;
+    }
+    @keyframes spin{0%{transform:rotate(0deg);}100%{transform:rotate(360deg);}}
+
+    .vehicles-grid{display:flex;flex-direction:column;gap:12px;margin-bottom:22px;}
+
+    .vehicle-card{
+        background:#FAFBFA;
+        border:1px solid var(--line);
+        border-radius:4px;
+        padding:16px 18px;
+        cursor:pointer;
+        transition:border-color .2s, background .2s;
+        position:relative;
+    }
+    .vehicle-card::before{
+        content:'';position:absolute;left:0;top:14px;bottom:14px;width:3px;
+        background:var(--amber);border-radius:0 2px 2px 0;opacity:0;transition:opacity .2s;
+    }
+    .vehicle-card:hover{border-color:var(--teal-line);}
+    .vehicle-card.active{border-color:var(--teal);background:var(--paper);}
+    .vehicle-card.active::before{opacity:1;}
+
+    .vehicle-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:12px;flex-wrap:wrap;}
+    .vehicle-reg{font-family:var(--mono);font-size:16px;font-weight:700;color:var(--ink);letter-spacing:.01em;}
+    .vehicle-header-right{display:flex;align-items:center;gap:10px;}
+
+    .distance-meter{
+        background:var(--amber-soft);color:#9A5814;border:1px solid #F1D2A6;
+        padding:4px 11px;border-radius:20px;font-size:11.5px;font-weight:700;font-family:var(--mono);
+        white-space:nowrap;
+    }
+
+    .detect-badge{
+        background:var(--teal-soft);color:var(--teal);border:1px solid var(--teal-line);
+        padding:4px 11px;border-radius:20px;font-size:11.5px;font-weight:700;font-family:var(--mono);
+        white-space:nowrap;
+    }
+
+    .vehicle-summary-row{display:flex;flex-wrap:wrap;gap:18px;margin-bottom:8px;}
+    .vehicle-info{font-size:12.5px;color:var(--muted);}
+    .vehicle-info strong{color:var(--ink);font-weight:600;margin-right:3px;}
+
+    .vehicle-type{
+        display:inline-block;background:var(--teal-soft);color:var(--teal);
+        padding:3px 9px;border-radius:3px;font-size:11px;font-weight:700;font-family:var(--mono);
+    }
+
+    .coords-line{font-size:11px;color:var(--muted-2);font-family:var(--mono);margin-bottom:2px;}
+
+    .expand-hint{
+        font-size:11px;color:var(--teal);font-weight:600;margin-top:10px;font-family:var(--mono);
+        display:flex;align-items:center;gap:5px;
+    }
+
+    .vehicle-logs-panel{
+        display:none;margin-top:15px;padding-top:15px;
+        border-top:1px dashed var(--line);overflow-x:auto;
+    }
+    .vehicle-logs-panel.show{display:block;}
+
+    .vehicle-logs-title{
+        font-weight:700;color:var(--ink);margin-bottom:10px;font-size:12.5px;
+        font-family:var(--mono);text-transform:uppercase;letter-spacing:.05em;
+        display:flex;align-items:center;gap:8px;
+    }
+    .vehicle-logs-title .count-pill{
+        background:var(--teal);color:#fff;padding:2px 8px;border-radius:20px;font-size:10.5px;
+    }
+    .logs-scope-note{
+        font-size:11px;color:var(--muted-2);font-weight:400;text-transform:none;letter-spacing:0;
+        margin-bottom:8px;
+    }
+
+    .details-table{width:100%;border-collapse:collapse;font-size:12px;font-family:var(--mono);}
+    .details-table th{
+        background:var(--teal-soft);color:#0C5347;padding:10px 12px;text-align:left;
+        font-weight:600;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;
+        border-bottom:1px solid var(--teal-line);white-space:nowrap;
+    }
+    .details-table td{padding:9px 12px;border-bottom:1px solid var(--line-soft);color:var(--ink);white-space:nowrap;}
+    .details-table tbody tr:hover{background:var(--amber-soft);}
+    .details-table td.dist-cell{color:#9A5814;font-weight:700;}
+
+    .empty-logs{color:var(--muted);font-size:12.5px;padding:6px 0;}
+
+    .kml-btn{
+        background:var(--paper);color:var(--teal);
+        border:1px solid var(--teal-line);border-radius:3px;
+        padding:6px 12px;font-size:11px;font-weight:700;font-family:var(--body);
+        cursor:pointer;transition:background .2s;white-space:nowrap;
+        display:inline-flex;align-items:center;gap:5px;
+    }
+    .kml-btn:hover{background:var(--teal-soft);}
+
+    .export-btn{
+        margin-top:4px;padding:11px 22px;background:transparent;color:var(--green);
+        border:1px solid #BFE0C9;border-radius:3px;cursor:pointer;
+        font-weight:700;font-size:13px;font-family:var(--body);transition:background .2s;
+    }
+    .export-btn:hover{background:var(--green-soft);}
+
+    .export-actions{display:flex;flex-wrap:wrap;gap:10px;}
+
+    .kml-all-btn{
+        margin-top:4px;padding:11px 22px;background:transparent;color:var(--teal);
+        border:1px solid var(--teal-line);border-radius:3px;cursor:pointer;
+        font-weight:700;font-size:13px;font-family:var(--body);transition:background .2s;
+    }
+    .kml-all-btn:hover{background:var(--teal-soft);}
+
+    @media (max-width:720px){
+        .search-form{grid-template-columns:1fr;}
+        .header{flex-direction:column;text-align:center;}
+        .vehicle-summary-row{gap:10px;}
+        .details-table{font-size:11px;}
+    }
+</style>
+</head>
+<body>
+<div class="container">
+
+    <div class="header">
+        <div class="compass">
+            <div class="compass-n">N</div>
+            <div class="compass-needle"></div>
+            <div class="compass-dot"></div>
+        </div>
+        <div class="header-text">
+            <div class="eyebrow">Fleet · Geolocation Search</div>
+            <h1>GPS Proximity Vehicle Search</h1>
+            <p>Upload GPS logs and find vehicles within a chosen radius of any coordinate</p>
+        </div>
+    </div>
+
+    <!-- File Upload Section -->
+    <div class="panel">
+        <div class="panel-title"><span class="idx">01</span><span class="label">Upload Data</span></div>
+        <div class="info-box">
+            <strong>Note:</strong> You can upload multiple files. Supports two formats:<br>
+            <strong>Format 1:</strong> <code>RegistrationNo | Latitude | Longitude | VehicleType | FleetId | Speed | DateTime | IMEI | ReceivedAt | Ignition</code><br>
+            <strong>Format 2:</strong> <code>Date | Vehicle Registration No. | Fleet ID | Chassis No. | Start Time | End Time | Duration (in Min.) | Lat Lng</code>
+        </div>
+        <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+            <div class="upload-icon">📤</div>
+            <p><strong>Click to upload or drag & drop</strong></p>
+            <div class="sub">.xlsx · .xls · .csv</div>
+            <input type="file" id="fileInput" multiple accept=".xlsx,.xls,.csv" onchange="handleFileSelect(event)">
+        </div>
+        <div class="file-list" id="fileList"></div>
+    </div>
+
+    <!-- Search Section -->
+    <div class="panel">
+        <div class="panel-title"><span class="idx">02</span><span class="label">Proximity Search</span></div>
+        <div class="search-form">
+            <div class="form-group">
+                <label for="coordinates">Latitude, Longitude</label>
+                <input type="text" id="coordinates" placeholder="19.2403, 72.8479">
+            </div>
+            <div class="form-group">
+                <label for="radius">Search Radius (meters)</label>
+                <input type="number" id="radius" placeholder="50" value="50" min="1" max="10000">
+            </div>
+            <div class="form-group">
+                <label for="intervalMinutes">Detection Interval (minutes)</label>
+                <input type="number" id="intervalMinutes" placeholder="15" value="15" min="1" max="1440" oninput="updateDetectionBadges()">
+            </div>
+            <button class="search-button" onclick="searchNearbyVehicles()">Search Nearby Vehicles</button>
+        </div>
+        <div class="error" id="errorMsg"></div>
+    </div>
+
+    <!-- Results Section -->
+    <div class="panel results-section" id="resultsSection">
+        <div class="panel-title"><span class="idx">03</span><span class="label">Results</span></div>
+        <div id="resultCount" class="result-count"></div>
+
+        <div id="loadingDiv" class="loading" style="display:none;">
+            <div class="spinner"></div>
+            <p>Searching nearby vehicles...</p>
+        </div>
+
+        <div id="vehiclesDiv" class="vehicles-grid"></div>
+
+        <div class="export-actions">
+            <button class="export-btn" id="exportBtn" onclick="exportResults()" style="display:none;">Export Results to CSV</button>
+            <button class="kml-all-btn" id="kmlAllBtn" onclick="downloadAllVehiclesKML()" style="display:none;">⤓ Download All KML (All Found Vehicles)</button>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    let allData = [];
+    let searchResults = [];
+    // Remembers the last search so log expansion / KML export can stay scoped to it
+    let lastSearch = { lat: null, lon: null, radius: null };
+
+    // Simple CSV Parser
+    function parseCSV(text) {
+        const lines = text.split('\n');
+        if (lines.length < 2) return [];
+
+        const headers = lines[0].split(',').map(h => h.trim());
+        const data = [];
+
+        for (let i = 1; i < lines.length; i++) {
+            if (lines[i].trim() === '') continue;
+
+            let values = [];
+            let current = '';
+            let inQuotes = false;
+
+            for (let j = 0; j < lines[i].length; j++) {
+                const char = lines[i][j];
+
+                if (char === '"') {
+                    inQuotes = !inQuotes;
+                } else if (char === ',' && !inQuotes) {
+                    values.push(current.trim().replace(/^"|"$/g, ''));
+                    current = '';
+                } else {
+                    current += char;
+                }
+            }
+            values.push(current.trim().replace(/^"|"$/g, ''));
+
+            const row = {};
+            headers.forEach((header, index) => {
+                row[header] = values[index] || '';
+            });
+
+            if (row.RegistrationNo) {
+                data.push(row);
+            }
+        }
+
+        return data;
+    }
+
+    // Normalize data from both formats to standard format
+    function normalizeRowData(row) {
+        // Check which format we have
+        const hasFormat2 = row['Vehicle Registration No.'] || row['Lat Lng'] || row['Chassis No.'];
+        
+        if (hasFormat2 || row['Lat Lng']) {
+            // Format 2: New format with Lat Lng combined
+            let lat = null, lon = null;
+            
+            // Parse "Lat Lng" field - could be "19.2403, 72.8479" or "19.2403,72.8479"
+            if (row['Lat Lng']) {
+                const coords = row['Lat Lng'].split(',').map(c => c.trim());
+                if (coords.length >= 2) {
+                    lat = parseFloat(coords[0]);
+                    lon = parseFloat(coords[1]);
+                }
+            }
+
+            return {
+                RegistrationNo: row['Vehicle Registration No.'] || row['Reg No.'] || row['RegNo'] || '-',
+                Latitude: lat,
+                Longitude: lon,
+                VehicleType: row['Vehicle Type'] || row['VehicleType'] || 'N/A',
+                FleetId: row['Fleet ID'] || row['FleetID'] || row['FleetId'] || 'N/A',
+                ChassisNo: row['Chassis No.'] || row['ChassisNo'] || 'N/A',
+                DateTime: row['Date'] || row['DateTime'] || '-',
+                StartTime: row['Start Time'] || row['StartTime'] || '-',
+                EndTime: row['End Time'] || row['EndTime'] || '-',
+                Duration: row['Duration (in Min.)'] || row['Duration'] || '-',
+                Speed: row['Speed'] || 'N/A',
+                IMEI: row['IMEI'] || 'N/A',
+                ReceivedAt: row['ReceivedAt'] || 'N/A',
+                Ignition: row['Ignition'] || 'N/A'
+            };
+        } else {
+            // Format 1: Original format
+            return {
+                RegistrationNo: row.RegistrationNo || row['Registration No.'] || row['RegNo'] || '-',
+                Latitude: row.Latitude ? parseFloat(row.Latitude) : (row['Lat'] ? parseFloat(row['Lat']) : null),
+                Longitude: row.Longitude ? parseFloat(row.Longitude) : (row['Lon'] ? parseFloat(row['Lon']) : null),
+                VehicleType: row.VehicleType || row['Vehicle Type'] || 'N/A',
+                FleetId: row.FleetId || row['Fleet ID'] || row['FleetID'] || 'N/A',
+                ChassisNo: row.ChassisNo || row['Chassis No.'] || 'N/A',
+                DateTime: row.DateTime || row['Date'] || '-',
+                Speed: row.Speed || 'N/A',
+                IMEI: row.IMEI || 'N/A',
+                ReceivedAt: row.ReceivedAt || 'N/A',
+                Ignition: row.Ignition || 'N/A'
+            };
+        }
+    }
+
+    // Haversine formula to calculate distance between two coordinates
+    function calculateDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371000; // Earth radius in meters
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a =
+            Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon/2) * Math.sin(dLon/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        return R * c;
+    }
+
+    function handleFileSelect(event) {
+        const files = event.target.files;
+        
+        // Check if XLSX library is loaded
+        if (typeof XLSX === 'undefined' && Array.from(files).some(f => f.name.endsWith('.xlsx') || f.name.endsWith('.xls'))) {
+            showError('XLSX library is not loaded. Please refresh the page and try again.');
+            return;
+        }
+        
+        allData = [];
+        let filesProcessed = 0;
+        const totalFiles = files.length;
+
+        Array.from(files).forEach((file) => {
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                try {
+                    let data = [];
+
+                    if (file.name.endsWith('.csv')) {
+                        data = parseCSV(e.target.result);
+                    } else if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+                        // Excel files need to be read as ArrayBuffer
+                        if (typeof e.target.result === 'string') {
+                            // Fallback if loaded as text
+                            showError(`${file.name}: Excel file was read as text. Please try again.`);
+                            return;
+                        }
+                        const workbook = XLSX.read(e.target.result, { type: 'array' });
+                        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                        data = XLSX.utils.sheet_to_json(firstSheet);
+                    } else {
+                        showError(`${file.name}: Unsupported file type. Use .xlsx, .xls, or .csv`);
+                        return;
+                    }
+
+                    // Normalize all rows to standard format and filter valid entries
+                    data = data
+                        .map(row => normalizeRowData(row))
+                        .filter(row => row.RegistrationNo && row.RegistrationNo !== '-' && row.Latitude && row.Longitude);
+
+                    if (data.length > 0) {
+                        allData = allData.concat(data);
+                    } else {
+                        showError(`No valid records found in ${file.name}. Please check that the file contains Vehicle Registration No., Latitude/Longitude or Lat Lng columns.`);
+                    }
+                } catch (error) {
+                    showError(`Error reading ${file.name}: ${error.message}`);
+                } finally {
+                    filesProcessed++;
+                    if (filesProcessed === totalFiles) {
+                        updateFileList();
+                    }
+                }
+            };
+
+            reader.onerror = function() {
+                showError(`Failed to read file: ${file.name}`);
+                filesProcessed++;
+                if (filesProcessed === totalFiles) {
+                    updateFileList();
+                }
+            };
+
+            // Use ArrayBuffer for Excel files, Text for CSV
+            if (file.name.endsWith('.csv')) {
+                reader.readAsText(file, 'UTF-8');
+            } else if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+                reader.readAsArrayBuffer(file);
+            }
+        });
+    }
+
+    function updateFileList() {
+        const fileListDiv = document.getElementById('fileList');
+        const input = document.getElementById('fileInput');
+        const files = input.files;
+
+        fileListDiv.innerHTML = '';
+        Array.from(files).forEach((file, index) => {
+            const fileItem = document.createElement('div');
+            fileItem.className = 'file-item';
+            fileItem.innerHTML = `
+                <span>✓ ${file.name} (${(file.size/1024).toFixed(2)} KB)</span>
+                <button class="remove-btn" onclick="removeFile(${index})">Remove</button>
+            `;
+            fileListDiv.appendChild(fileItem);
+        });
+    }
+
+    function removeFile(index) {
+        const input = document.getElementById('fileInput');
+        const files = Array.from(input.files);
+        files.splice(index, 1);
+
+        const newInput = document.createElement('input');
+        newInput.type = 'file';
+        newInput.id = 'fileInput';
+        newInput.multiple = true;
+        newInput.accept = '.xlsx,.xls,.csv';
+        newInput.onchange = handleFileSelect;
+
+        const dt = new DataTransfer();
+        files.forEach(file => dt.items.add(file));
+        newInput.files = dt.files;
+
+        input.parentNode.replaceChild(newInput, input);
+        handleFileSelect({target: newInput});
+    }
+
+    function searchNearbyVehicles() {
+        const coordinates = document.getElementById('coordinates').value.trim();
+        const radius = parseInt(document.getElementById('radius').value) || 50;
+        const errorDiv = document.getElementById('errorMsg');
+
+        errorDiv.classList.remove('show');
+
+        const parts = coordinates.split(',').map(p => p.trim());
+
+        if (parts.length !== 2) {
+            showError('Please separate coordinates with a comma, e.g. 19.2403, 72.8479');
+            return;
+        }
+
+        const lat = parseFloat(parts[0]);
+        const lon = parseFloat(parts[1]);
+
+        if (isNaN(lat) || isNaN(lon)) {
+            showError('Please enter a valid latitude and longitude');
+            return;
+        }
+
+        if (lat < -90 || lat > 90) {
+            showError('Latitude must be between -90 and 90');
+            return;
+        }
+
+        if (lon < -180 || lon > 180) {
+            showError('Longitude must be between -180 and 180');
+            return;
+        }
+
+        if (allData.length === 0) {
+            showError('Please upload Excel/CSV files first');
+            return;
+        }
+
+        const loadingDiv = document.getElementById('loadingDiv');
+        loadingDiv.style.display = 'block';
+
+        setTimeout(() => {
+            const nearestByVehicle = new Map();
+
+            allData.forEach(row => {
+                if (row.Latitude && row.Longitude && row.RegistrationNo) {
+                    const vehicleLat = parseFloat(row.Latitude);
+                    const vehicleLon = parseFloat(row.Longitude);
+                    const distance = calculateDistance(lat, lon, vehicleLat, vehicleLon);
+
+                    if (distance <= radius) {
+                        const existing = nearestByVehicle.get(row.RegistrationNo);
+                        if (!existing || distance < existing._distanceNum) {
+                            nearestByVehicle.set(row.RegistrationNo, {
+                                ...row,
+                                distance: distance.toFixed(2),
+                                _distanceNum: distance
+                            });
+                        }
+                    }
+                }
+            });
+
+            // Only vehicles (deduped, one card per unique RegistrationNo)
+            searchResults = Array.from(nearestByVehicle.values());
+
+            // Remember the search center + radius so log expansion and KML export stay scoped to it
+            lastSearch = { lat, lon, radius };
+
+            loadingDiv.style.display = 'none';
+            displayResults(lat, lon, radius);
+        }, 500);
+    }
+
+    function displayResults(searchLat, searchLon, radius) {
+        const resultsSection = document.getElementById('resultsSection');
+        const resultCount = document.getElementById('resultCount');
+        const vehiclesDiv = document.getElementById('vehiclesDiv');
+        const exportBtn = document.getElementById('exportBtn');
+
+        resultsSection.classList.add('show');
+        vehiclesDiv.innerHTML = '';
+
+        if (searchResults.length === 0) {
+            resultCount.textContent = `No vehicles found within ${radius}m`;
+            resultCount.classList.add('no-results');
+            exportBtn.style.display = 'none';
+            document.getElementById('kmlAllBtn').style.display = 'none';
+            return;
+        }
+
+        resultCount.textContent = `${searchResults.length} vehicle(s) found within ${radius}m  ·  center: ${searchLat.toFixed(4)}, ${searchLon.toFixed(4)}`;
+        resultCount.classList.remove('no-results');
+
+        // Sort by distance
+        searchResults.sort((a, b) => parseFloat(a.distance) - parseFloat(b.distance));
+
+        // Create vehicle cards (one per unique vehicle, logs expand inline below on click)
+        searchResults.forEach((result, index) => {
+            const card = document.createElement('div');
+            card.className = 'vehicle-card';
+            card.id = `vehicle-card-${index}`;
+            const detectCount = computeDetectionCount(result.RegistrationNo, getIntervalMinutes());
+
+            card.innerHTML = `
+                <div class="vehicle-card-top" onclick="toggleVehicleLogs(${index})">
+                    <div class="vehicle-header">
+                        <div class="vehicle-reg">${result.RegistrationNo || 'N/A'}</div>
+                        <div class="vehicle-header-right">
+                            <button class="kml-btn" onclick="event.stopPropagation(); downloadVehicleKML(${index});">⤓ KML</button>
+                            <div class="detect-badge" id="detect-badge-${index}" title="Distinct detections within the chosen interval">⚡ Detected ${detectCount}x</div>
+                            <div class="distance-meter">${result.distance} m</div>
+                        </div>
+                    </div>
+                    <div class="vehicle-summary-row">
+                        <div class="vehicle-info"><strong>Type</strong> <span class="vehicle-type">${result.VehicleType || 'N/A'}</span></div>
+                        <div class="vehicle-info"><strong>Fleet ID</strong> ${result.FleetId || 'N/A'}</div>
+                        ${result.ChassisNo && result.ChassisNo !== 'N/A' ? `<div class="vehicle-info"><strong>Chassis</strong> ${result.ChassisNo}</div>` : ''}
+                        ${result.Speed !== 'N/A' ? `<div class="vehicle-info"><strong>Speed</strong> ${result.Speed}</div>` : ''}
+                        ${result.DateTime && result.DateTime !== '-' ? `<div class="vehicle-info"><strong>Date</strong> ${result.DateTime}</div>` : ''}
+                    </div>
+                    <div class="coords-line">lat ${parseFloat(result.Latitude).toFixed(6)} · lon ${parseFloat(result.Longitude).toFixed(6)}</div>
+                    <div class="expand-hint" id="expand-hint-${index}">▾ Click to view logs within ${radius}m</div>
+                </div>
+                <div class="vehicle-logs-panel" id="vehicle-logs-${index}"></div>
+            `;
+
+            vehiclesDiv.appendChild(card);
+        });
+
+        exportBtn.style.display = 'inline-block';
+        document.getElementById('kmlAllBtn').style.display = 'inline-block';
+    }
+
+    // Recalculates every visible "Detected Nx" badge using the current value
+    // of the Detection Interval input, without re-running the whole search.
+    function updateDetectionBadges() {
+        if (!searchResults || searchResults.length === 0 || lastSearch.lat === null) return;
+        const interval = getIntervalMinutes();
+        searchResults.forEach((result, index) => {
+            const badge = document.getElementById(`detect-badge-${index}`);
+            if (badge) {
+                const count = computeDetectionCount(result.RegistrationNo, interval);
+                badge.textContent = `⚡ Detected ${count}x`;
+            }
+        });
+    }
+
+    function toggleVehicleLogs(index) {
+        const card = document.getElementById(`vehicle-card-${index}`);
+        const panel = document.getElementById(`vehicle-logs-${index}`);
+        const hint = document.getElementById(`expand-hint-${index}`);
+        const vehicle = searchResults[index];
+        const radius = lastSearch.radius;
+
+        const isOpen = panel.classList.contains('show');
+
+        if (isOpen) {
+            panel.classList.remove('show');
+            panel.innerHTML = '';
+            card.classList.remove('active');
+            hint.textContent = `▾ Click to view logs within ${radius}m`;
+            return;
+        }
+
+        // Only logs of this vehicle that ALSO fall within the searched radius
+        // of the searched center point — not every log the vehicle ever had.
+        const vehicleLogs = allData
+            .filter(row => row.RegistrationNo === vehicle.RegistrationNo && row.Latitude && row.Longitude)
+            .map(row => {
+                const d = calculateDistance(lastSearch.lat, lastSearch.lon, parseFloat(row.Latitude), parseFloat(row.Longitude));
+                return { ...row, _dist: d };
+            })
+            .filter(row => row._dist <= radius)
+            .sort((a, b) => a._dist - b._dist);
+
+        if (vehicleLogs.length === 0) {
+            panel.innerHTML = `<p class="empty-logs">No logs found for this vehicle within ${radius}m</p>`;
+        } else {
+            let tableHTML = `
+                <div class="vehicle-logs-title">
+                    ${vehicle.RegistrationNo}
+                    <span class="count-pill">${vehicleLogs.length} logs</span>
+                </div>
+                <div class="logs-scope-note">Showing only logs within ${radius}m of center: ${lastSearch.lat.toFixed(4)}, ${lastSearch.lon.toFixed(4)}</div>
+                <table class="details-table">
+                    <thead>
+                        <tr>
+                            <th>Distance</th>
+                            <th>DateTime</th>
+                            <th>Latitude</th>
+                            <th>Longitude</th>
+                            <th>Speed</th>
+                            <th>Vehicle Type</th>
+                            <th>Fleet ID</th>
+                            <th>Chassis No.</th>
+                            <th>Start Time</th>
+                            <th>End Time</th>
+                            <th>Duration</th>
+                            <th>IMEI</th>
+                            <th>Received At</th>
+                            <th>Ignition</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            vehicleLogs.forEach(log => {
+                tableHTML += `
+                    <tr>
+                        <td class="dist-cell">${log._dist.toFixed(2)} m</td>
+                        <td>${log.DateTime || '-'}</td>
+                        <td>${log.Latitude ? parseFloat(log.Latitude).toFixed(6) : '-'}</td>
+                        <td>${log.Longitude ? parseFloat(log.Longitude).toFixed(6) : '-'}</td>
+                        <td>${log.Speed || '-'}</td>
+                        <td>${log.VehicleType || '-'}</td>
+                        <td>${log.FleetId || '-'}</td>
+                        <td>${log.ChassisNo || '-'}</td>
+                        <td>${log.StartTime || '-'}</td>
+                        <td>${log.EndTime || '-'}</td>
+                        <td>${log.Duration || '-'}</td>
+                        <td>${log.IMEI || '-'}</td>
+                        <td>${log.ReceivedAt || '-'}</td>
+                        <td>${log.Ignition || '-'}</td>
+                    </tr>
+                `;
+            });
+
+            tableHTML += `
+                    </tbody>
+                </table>
+            `;
+
+            panel.innerHTML = tableHTML;
+        }
+
+        panel.classList.add('show');
+        card.classList.add('active');
+        hint.textContent = '▴ Click to collapse';
+    }
+
+    // A palette of distinct KML icon colors (format: aabbggrr) so each
+    // vehicle gets its own color when multiple vehicles are shown together.
+    const KML_COLOR_PALETTE = [
+        'ff1421e8', // red
+        'ffe8710f', // blue
+        'ff2fa63a', // green
+        'ff00d8ff', // yellow
+        'ff9c1ad6', // purple/magenta
+        'ffdfd214', // cyan
+        'ff0aa5ff', // orange
+        'ffb469ff', // pink
+        'ff13458b', // brown
+        'ff32cd32', // lime
+        'ff8000ff', // deep pink/red-violet
+        'ff8080ff'  // salmon
+    ];
+    function getVehicleColor(index) {
+        return KML_COLOR_PALETTE[index % KML_COLOR_PALETTE.length];
+    }
+
+    // Reads the current detection interval (minutes) from the input field.
+    function getIntervalMinutes() {
+        const val = parseFloat(document.getElementById('intervalMinutes').value);
+        return (!isNaN(val) && val > 0) ? val : 15;
+    }
+
+    // Counts how many separate "detections" a vehicle has within the searched
+    // radius. Only points that fall inside the radius are considered; readings
+    // that are within `intervalMinutes` of the previous one are treated as the
+    // SAME detection (merged together), so rapid repeat pings don't inflate
+    // the count. A new detection starts only when the time gap since the last
+    // in-radius reading exceeds the chosen interval.
+    function computeDetectionCount(regNo, intervalMinutes) {
+        const rows = allData
+            .filter(row => row.RegistrationNo === regNo && row.Latitude && row.Longitude)
+            .map((row, i) => {
+                const d = calculateDistance(lastSearch.lat, lastSearch.lon, parseFloat(row.Latitude), parseFloat(row.Longitude));
+                return { row, _origIdx: i, _dist: d };
+            })
+            .filter(r => r._dist <= lastSearch.radius);
+
+        if (rows.length === 0) return 0;
+
+        rows.sort((a, b) => {
+            const ta = Date.parse(a.row.DateTime);
+            const tb = Date.parse(b.row.DateTime);
+            if (!isNaN(ta) && !isNaN(tb)) return ta - tb;
+            return a._origIdx - b._origIdx;
+        });
+
+        const intervalMs = intervalMinutes * 60 * 1000;
+        let count = 1;
+        let prevTime = Date.parse(rows[0].row.DateTime);
+
+        for (let i = 1; i < rows.length; i++) {
+            const t = Date.parse(rows[i].row.DateTime);
+            if (!isNaN(t) && !isNaN(prevTime)) {
+                if (t - prevTime > intervalMs) count++;
+                prevTime = t;
+            }
+            // if DateTime can't be parsed for this row, keep it merged with
+            // the current detection rather than guessing a gap
+        }
+
+        return count;
+    }
+
+    // Escape special characters so values are safe to embed inside KML/XML
+    function escapeXML(str) {
+        return String(str === undefined || str === null ? '' : str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&apos;');
+    }
+
+    // Builds a ring of lon,lat points approximating a circle of `radius`
+    // meters around (lat, lon) — used to draw the search radius in KML.
+    function buildCircleCoordinates(lat, lon, radius, numPoints = 72) {
+        const coords = [];
+        const latRad = lat * Math.PI / 180;
+        for (let i = 0; i <= numPoints; i++) {
+            const angle = (i / numPoints) * 2 * Math.PI;
+            const dLat = (radius * Math.cos(angle)) / 111320;
+            const dLon = (radius * Math.sin(angle)) / (111320 * Math.cos(latRad));
+            coords.push(`${(lon + dLon).toFixed(7)},${(lat + dLat).toFixed(7)},0`);
+        }
+        return coords.join(' ');
+    }
+
+    // Builds the full KML document: search center, radius circle, and
+    // every matched point (for the given vehicle) inside that radius.
+    function buildKML(vehicleRegNo, centerLat, centerLon, radius, points, color, detectCount, intervalMinutes) {
+        const circleCoords = buildCircleCoordinates(centerLat, centerLon, radius);
+        const iconColor = color || getVehicleColor(0);
+        const statsLine = (typeof detectCount === 'number')
+            ? `Detected: ${detectCount} time(s) (within ${intervalMinutes} min interval)<br/>`
+            : '';
+
+        const placemarks = points.map((p, i) => `
+    <Placemark>
+      <name>${escapeXML(vehicleRegNo)} - Point ${i + 1}</name>
+      <description><![CDATA[
+        Distance: ${p._dist.toFixed(2)} m<br/>
+        DateTime: ${escapeXML(p.DateTime || '-')}<br/>
+        Speed: ${escapeXML(p.Speed || '-')}<br/>
+        FleetId: ${escapeXML(p.FleetId || '-')}<br/>
+        IMEI: ${escapeXML(p.IMEI || '-')}<br/>
+        Ignition: ${escapeXML(p.Ignition || '-')}
+      ]]></description>
+      <styleUrl>#vehiclePointStyle</styleUrl>
+      <Point>
+        <coordinates>${parseFloat(p.Longitude).toFixed(7)},${parseFloat(p.Latitude).toFixed(7)},0</coordinates>
+      </Point>
+    </Placemark>`).join('');
+
+        return `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+<Document>
+  <name>${escapeXML(vehicleRegNo)} - within ${radius}m</name>
+
+  <Style id="centerPointStyle">
+    <IconStyle>
+      <color>ff00ffff</color>
+      <scale>1.2</scale>
+      <Icon><href>http://maps.google.com/mapfiles/kml/shapes/target.png</href></Icon>
+    </IconStyle>
+  </Style>
+
+  <Style id="vehiclePointStyle">
+    <IconStyle>
+      <color>${iconColor}</color>
+      <scale>1.6</scale>
+      <Icon><href>https://maps.google.com/mapfiles/kml/shapes/cabs.png</href></Icon>
+    </IconStyle>
+    <LabelStyle>
+      <color>${iconColor}</color>
+      <scale>0.9</scale>
+    </LabelStyle>
+  </Style>
+
+  <Style id="radiusStyle">
+    <LineStyle>
+      <color>ffd0d92f</color>
+      <width>2</width>
+    </LineStyle>
+    <PolyStyle>
+      <color>3300ffff</color>
+    </PolyStyle>
+  </Style>
+
+  <Placemark>
+    <name>Search Center</name>
+    <description>The coordinates you searched (radius: ${radius}m)</description>
+    <styleUrl>#centerPointStyle</styleUrl>
+    <Point>
+      <coordinates>${centerLon.toFixed(7)},${centerLat.toFixed(7)},0</coordinates>
+    </Point>
+  </Placemark>
+
+  <Placemark>
+    <name>Search Radius (${radius}m)</name>
+    <styleUrl>#radiusStyle</styleUrl>
+    <Polygon>
+      <outerBoundaryIs>
+        <LinearRing>
+          <coordinates>${circleCoords}</coordinates>
+        </LinearRing>
+      </outerBoundaryIs>
+    </Polygon>
+  </Placemark>
+
+  <Folder>
+    <name>${escapeXML(vehicleRegNo)}</name>
+    <description><![CDATA[${statsLine}Total logs within radius: ${points.length}]]></description>
+${placemarks}
+  </Folder>
+</Document>
+</kml>`;
+    }
+
+    // Builds one combined KML document containing the search center, the
+    // radius circle, and a separate <Folder> per vehicle (each with its own
+    // color/icon) with all of that vehicle's points which fall inside the
+    // searched radius, plus how many times it entered/exited the radius.
+    function buildCombinedKML(centerLat, centerLon, radius, vehicleGroups) {
+        const circleCoords = buildCircleCoordinates(centerLat, centerLon, radius);
+
+        const vehicleStyles = vehicleGroups.map((group, vIdx) => `
+  <Style id="vehicleStyle${vIdx}">
+    <IconStyle>
+      <color>${getVehicleColor(vIdx)}</color>
+      <scale>1.6</scale>
+      <Icon><href>https://maps.google.com/mapfiles/kml/shapes/cabs.png</href></Icon>
+    </IconStyle>
+    <LabelStyle>
+      <color>${getVehicleColor(vIdx)}</color>
+      <scale>0.9</scale>
+    </LabelStyle>
+  </Style>`).join('');
+
+        const folders = vehicleGroups.map((group, vIdx) => {
+            const placemarks = group.points.map((p, i) => `
+      <Placemark>
+        <name>${escapeXML(group.regNo)} - Point ${i + 1}</name>
+        <description><![CDATA[
+          Distance: ${p._dist.toFixed(2)} m<br/>
+          DateTime: ${escapeXML(p.DateTime || '-')}<br/>
+          Speed: ${escapeXML(p.Speed || '-')}<br/>
+          FleetId: ${escapeXML(p.FleetId || '-')}<br/>
+          IMEI: ${escapeXML(p.IMEI || '-')}<br/>
+          Ignition: ${escapeXML(p.Ignition || '-')}
+        ]]></description>
+        <styleUrl>#vehicleStyle${vIdx}</styleUrl>
+        <Point>
+          <coordinates>${parseFloat(p.Longitude).toFixed(7)},${parseFloat(p.Latitude).toFixed(7)},0</coordinates>
+        </Point>
+      </Placemark>`).join('');
+
+            const detectCount = group.detectCount;
+            const statsText = (typeof detectCount === 'number') ? ` · Detected ${detectCount}x` : '';
+
+            return `
+  <Folder>
+    <name>${escapeXML(group.regNo)} (${group.points.length} pt${group.points.length === 1 ? '' : 's'}${statsText})</name>
+    <description><![CDATA[${(typeof detectCount === 'number') ? `Detected: ${detectCount} time(s) (within ${group.intervalMinutes} min interval)<br/>` : ''}Total logs within radius: ${group.points.length}]]></description>${placemarks}
+  </Folder>`;
+        }).join('');
+
+        return `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+<Document>
+  <name>All Found Vehicles - within ${radius}m</name>
+
+  <Style id="centerPointStyle">
+    <IconStyle>
+      <color>ff00ffff</color>
+      <scale>1.2</scale>
+      <Icon><href>http://maps.google.com/mapfiles/kml/shapes/target.png</href></Icon>
+    </IconStyle>
+  </Style>
+${vehicleStyles}
+
+  <Style id="radiusStyle">
+    <LineStyle>
+      <color>ffd0d92f</color>
+      <width>2</width>
+    </LineStyle>
+    <PolyStyle>
+      <color>3300ffff</color>
+    </PolyStyle>
+  </Style>
+
+  <Placemark>
+    <name>Search Center</name>
+    <description>The coordinates you searched (radius: ${radius}m)</description>
+    <styleUrl>#centerPointStyle</styleUrl>
+    <Point>
+      <coordinates>${centerLon.toFixed(7)},${centerLat.toFixed(7)},0</coordinates>
+    </Point>
+  </Placemark>
+
+  <Placemark>
+    <name>Search Radius (${radius}m)</name>
+    <styleUrl>#radiusStyle</styleUrl>
+    <Polygon>
+      <outerBoundaryIs>
+        <LinearRing>
+          <coordinates>${circleCoords}</coordinates>
+        </LinearRing>
+      </outerBoundaryIs>
+    </Polygon>
+  </Placemark>
+${folders}
+</Document>
+</kml>`;
+    }
+
+    // Download a single combined KML for every vehicle found in the last
+    // search: search center, radius circle, and one folder per vehicle
+    // holding all of its points that fall within the searched radius.
+    function downloadAllVehiclesKML() {
+        if (!searchResults || searchResults.length === 0 || lastSearch.lat === null) {
+            showError('Please run a search first before downloading KML');
+            return;
+        }
+
+        const intervalMinutes = getIntervalMinutes();
+        const vehicleGroups = searchResults.map(vehicle => {
+            const points = allData
+                .filter(row => row.RegistrationNo === vehicle.RegistrationNo && row.Latitude && row.Longitude)
+                .map(row => {
+                    const d = calculateDistance(lastSearch.lat, lastSearch.lon, parseFloat(row.Latitude), parseFloat(row.Longitude));
+                    return { ...row, _dist: d };
+                })
+                .filter(row => row._dist <= lastSearch.radius)
+                .sort((a, b) => a._dist - b._dist);
+
+            return {
+                regNo: vehicle.RegistrationNo,
+                points,
+                detectCount: computeDetectionCount(vehicle.RegistrationNo, intervalMinutes),
+                intervalMinutes
+            };
+        }).filter(group => group.points.length > 0);
+
+        if (vehicleGroups.length === 0) {
+            showError('No log points found within the searched radius to include in KML');
+            return;
+        }
+
+        const kml = buildCombinedKML(lastSearch.lat, lastSearch.lon, lastSearch.radius, vehicleGroups);
+
+        const blob = new Blob([kml], { type: 'application/vnd.google-earth.kml+xml' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `all_vehicles_within_${lastSearch.radius}m.kml`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+    }
+
+    // Download a KML for one vehicle: the search center, the radius circle,
+    // and every log point of that vehicle which falls inside the radius.
+    function downloadVehicleKML(index) {
+        const vehicle = searchResults[index];
+        if (!vehicle || lastSearch.lat === null) {
+            showError('Please run a search first before downloading KML');
+            return;
+        }
+
+        const points = allData
+            .filter(row => row.RegistrationNo === vehicle.RegistrationNo && row.Latitude && row.Longitude)
+            .map(row => {
+                const d = calculateDistance(lastSearch.lat, lastSearch.lon, parseFloat(row.Latitude), parseFloat(row.Longitude));
+                return { ...row, _dist: d };
+            })
+            .filter(row => row._dist <= lastSearch.radius)
+            .sort((a, b) => a._dist - b._dist);
+
+        const intervalMinutes = getIntervalMinutes();
+        const detectCount = computeDetectionCount(vehicle.RegistrationNo, intervalMinutes);
+        const kml = buildKML(vehicle.RegistrationNo, lastSearch.lat, lastSearch.lon, lastSearch.radius, points, getVehicleColor(index), detectCount, intervalMinutes);
+
+        const blob = new Blob([kml], { type: 'application/vnd.google-earth.kml+xml' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${vehicle.RegistrationNo}_within_${lastSearch.radius}m.kml`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+    }
+
+    function showError(message) {
+        const errorDiv = document.getElementById('errorMsg');
+        errorDiv.textContent = '⚠ ' + message;
+        errorDiv.classList.add('show');
+    }
+
+    function exportResults() {
+        if (searchResults.length === 0) {
+            showError('No results to export');
+            return;
+        }
+
+        let csvContent = 'Distance(m),RegistrationNo,VehicleType,FleetId,ChassisNo,Latitude,Longitude,Speed,DateTime,StartTime,EndTime,Duration,IMEI,ReceivedAt,Ignition\n';
+
+        searchResults.forEach(row => {
+            csvContent += `${row.distance},"${row.RegistrationNo}","${row.VehicleType}","${row.FleetId}","${row.ChassisNo || ''}","${row.Latitude}","${row.Longitude}","${row.Speed}","${row.DateTime}","${row.StartTime || ''}","${row.EndTime || ''}","${row.Duration || ''}","${row.IMEI}","${row.ReceivedAt}","${row.Ignition}"\n`;
+        });
+
+        const blob = new Blob([csvContent], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `nearby_vehicles_${new Date().getTime()}.csv`;
+        a.click();
+    }
+
+    // Drag and drop support
+    document.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        document.querySelector('.upload-area').style.background = '#E4F1EE';
+    });
+
+    document.addEventListener('dragleave', () => {
+        document.querySelector('.upload-area').style.background = '';
+    });
+
+    document.addEventListener('drop', (e) => {
+        e.preventDefault();
+        document.querySelector('.upload-area').style.background = '';
+        document.getElementById('fileInput').files = e.dataTransfer.files;
+        handleFileSelect({target: document.getElementById('fileInput')});
+    });
+
+    // Footer styling
+    const style = document.createElement('style');
+    style.textContent = `
+        .footer {
+            text-align: center;
+            padding: 20px 16px;
+            margin-top: 40px;
+            border-top: 1px solid var(--line);
+            color: var(--muted-2);
+            font-size: 12px;
+            font-family: var(--mono);
+        }
+        .footer p {
+            margin: 0;
+        }
+    `;
+    document.head.appendChild(style);
+
+    // Add footer to page
+    const footer = document.createElement('div');
+    footer.className = 'footer';
+    footer.innerHTML = '<p>created by SEPL IT TEAM</p>';
+    document.body.appendChild(footer);
+</script>
+</body>
+</html>
